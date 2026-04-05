@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Распознавание текста</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Unbounded:wght@400;700&display=swap');
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--accent:#7c6aff;--accent2:#00e5c3;--text:#e8e8f0;--muted:#5a5a7a;--danger:#ff4d6a;--success:#00e5c3;--mono:'JetBrains Mono',monospace;--display:'Unbounded',sans-serif}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,106,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(124,106,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+  .container{width:100%;max-width:760px;position:relative;z-index:1}
+  header{margin-bottom:48px;text-align:center}
+  .logo-tag{display:inline-block;font-size:10px;letter-spacing:.3em;color:var(--accent);border:1px solid var(--accent);padding:4px 12px;margin-bottom:20px;text-transform:uppercase}
+  h1{font-family:var(--display);font-size:clamp(24px,5vw,40px);font-weight:700;line-height:1.1;background:linear-gradient(135deg,var(--text) 40%,var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px}
+  .subtitle{color:var(--muted);font-size:12px;letter-spacing:.05em}
+  .card{background:var(--surface);border:1px solid var(--border);padding:24px;margin-bottom:16px;position:relative}
+  .card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent)}
+  .card-title{font-size:10px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;margin-bottom:16px}
+  .key-row{display:flex;gap:8px}
+  input[type=password],input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:10px 14px;outline:none;transition:border-color .2s}
+  input:focus{border-color:var(--accent)}
+  .btn{background:var(--accent);color:#fff;border:none;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;padding:10px 20px;cursor:pointer;text-transform:uppercase;transition:opacity .2s,transform .1s;white-space:nowrap}
+  .btn:hover{opacity:.85}.btn:active{transform:scale(.98)}
+  .btn.secondary{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  .btn.secondary:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.success-btn{background:var(--success);color:#000}
+  .key-status{margin-top:8px;font-size:11px}
+  .key-status.ok{color:var(--success)}.key-status.err{color:var(--danger)}
+  .drop-zone{border:2px dashed var(--border);padding:48px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative;overflow:hidden}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(124,106,255,.04)}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .drop-icon{font-size:36px;margin-bottom:12px;display:block}
+  .drop-text{font-size:13px;color:var(--text);margin-bottom:6px}
+  .drop-hint{font-size:11px;color:var(--muted)}
+  .file-selected{display:none;align-items:center;gap:12px;padding:12px 16px;background:rgba(0,229,195,.05);border:1px solid rgba(0,229,195,.2);margin-top:12px}
+  .file-selected.show{display:flex}
+  .file-name{flex:1;font-size:12px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file-size{font-size:11px;color:var(--muted);flex-shrink:0}
+  .run-btn{width:100%;padding:16px;font-size:13px;letter-spacing:.2em;margin-top:8px;background:linear-gradient(135deg,var(--accent),#5b4dcc);position:relative;overflow:hidden}
+  .run-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);transform:translateX(-100%);transition:transform .4s}
+  .run-btn:hover::after{transform:translateX(100%)}
+  .run-btn:disabled{opacity:.4;cursor:not-allowed}.run-btn:disabled::after{display:none}
+  .progress{display:none;flex-direction:column;gap:12px;padding:20px;background:rgba(124,106,255,.06);border:1px solid rgba(124,106,255,.2);margin-top:16px}
+  .progress.show{display:flex}
+  .progress-header{display:flex;justify-content:space-between;align-items:center}
+  .progress-label{font-size:12px;color:var(--accent)}
+  .progress-pct{font-size:18px;font-weight:700;color:var(--accent);font-family:var(--display)}
+  .progress-bar-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+  .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s ease;width:0%}
+  .progress-steps{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+  .step{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);transition:color .3s}
+  .step.active{color:var(--text)}.step.done{color:var(--success)}
+  .step-icon{width:14px;height:14px;border-radius:50%;border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .3s}
+  .step.active .step-icon{border-color:var(--accent);background:var(--accent);animation:pulse 1s infinite}
+  .step.done .step-icon{border-color:var(--success);background:var(--success);color:#000}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  #result-card{display:none;margin-top:16px}
+  #result-card.show{display:block}
+  #result-card::before{background:var(--accent2)}
+  .result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+  .result-text{background:var(--bg);border:1px solid var(--border);padding:16px;font-size:12px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:500px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  .export-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+  .export-label{font-size:10px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;width:100%;margin-bottom:4px}
+  .error-msg{display:none;padding:14px 16px;background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.3);color:var(--danger);font-size:12px;margin-top:16px;line-height:1.6;white-space:pre-wrap}
+  .error-msg.show{display:block}
+  footer{margin-top:48px;text-align:center;font-size:10px;color:var(--muted);letter-spacing:.1em}
+  footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo-tag">AI · OCR · TOOL</div>
+    <h1>Распознавание<br>текста из файлов</h1>
+    <p class="subtitle">PDF любого размера · JPG · PNG · экспорт в TXT, PDF, Word</p>
+  </header>
+
+  <div class="card">
+    <div class="card-title">// API ключ Anthropic</div>
+    <div class="key-row">
+      <input type="password" id="api-key-input" placeholder="sk-ant-api03-..." autocomplete="off">
+      <button class="btn" onclick="saveKey()">Сохранить</button>
+      <button class="btn secondary" onclick="toggleKey()">👁</button>
+    </div>
+    <div class="key-status" id="key-status"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">// Файл для распознавания</div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".pdf,.jpg,.jpeg,.png" onchange="onFileSelect(this)">
+      <span class="drop-icon">📄</span>
+      <div class="drop-text">Перетащите файл или нажмите для выбора</div>
+      <div class="drop-hint">PDF любого размера, JPG, PNG</div>
+    </div>
+    <div class="file-selected" id="file-selected">
+      <span>✓</span>
+      <span class="file-name" id="file-name"></span>
+      <span class="file-size" id="file-size"></span>
+      <button class="btn secondary" style="padding:4px 10px;font-size:10px" onclick="clearFile()">✕</button>
+    </div>
+    <button class="btn run-btn" id="run-btn" onclick="recognize()" disabled>РАСПОЗНАТЬ ТЕКСТ</button>
+    <div class="progress" id="progress">
+      <div class="progress-header">
+        <span class="progress-label" id="progress-label">Подготовка...</span>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-steps" id="progress-steps"></div>
+    </div>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div class="card" id="result-card">
+    <div class="result-header">
+      <div class="card-title" style="margin:0">// Распознанный текст</div>
+      <button class="btn secondary" style="padding:6px 14px;font-size:10px" onclick="copyResult()" id="copy-btn">КОПИРОВАТЬ</button>
+    </div>
+    <div class="result-text" id="result-text"></div>
+    <div class="export-row">
+      <div class="export-label">Сохранить как:</div>
+      <button class="btn" onclick="downloadTxt()">📄 TXT</button>
+      <button class="btn success-btn" onclick="downloadDocx()">📝 WORD (.docx)</button>
+      <button class="btn secondary" onclick="downloadPdf()">🗒 PDF</button>
+    </div>
+  </div>
+
+  <footer>
+    Ключ хранится только в вашем браузере &nbsp;·&nbsp;
+    <a href="https://console.anthropic.com" target="_blank">Получить API ключ</a>
+  </footer>
+</div>
+<script>
+  const MAX_CHUNK_BYTES = 20 * 1024 * 1024;
+  let selectedFile = null;
+
+  function loadKey() {
+    const key = localStorage.getItem('anthropic_key') || '';
+    if (key) { document.getElementById('api-key-input').value = key; setKeyStatus('ok','✓ Ключ загружен'); }
+    updateBtn();
+  }
+  function saveKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key.startsWith('sk-ant-')) { setKeyStatus('err','✗ Должен начинаться с sk-ant-'); return; }
+    localStorage.setItem('anthropic_key', key);
+    setKeyStatus('ok','✓ Ключ сохранён'); updateBtn();
+  }
+  function toggleKey() { const i=document.getElementById('api-key-input'); i.type=i.type==='password'?'text':'password'; }
+  function setKeyStatus(t,m) { const e=document.getElementById('key-status'); e.textContent=m; e.className='key-status '+t; }
+  function getKey() { return document.getElementById('api-key-input').value.trim()||localStorage.getItem('anthropic_key')||''; }
+
+  function onFileSelect(input) {
+    const file = input.files[0]; if (!file) return;
+    selectedFile = file;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-size').textContent = fmt(file.size);
+    document.getElementById('file-selected').classList.add('show');
+    updateBtn(); hideError(); hideResult();
+  }
+  function clearFile() {
+    selectedFile = null; document.getElementById('file-input').value = '';
+    document.getElementById('file-selected').classList.remove('show'); updateBtn();
+  }
+  function fmt(b) {
+    if (b<1024) return b+' B'; if (b<1048576) return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+  }
+  function updateBtn() { document.getElementById('run-btn').disabled = !(selectedFile && getKey()); }
+
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('dragover')});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e=>{e.preventDefault();dz.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)onFileSelect({files:[f]})});
+
+  function initSteps(steps) {
+    document.getElementById('progress-steps').innerHTML = steps.map((s,i) =>
+      `<div class="step" id="step-${i}"><div class="step-icon" id="step-icon-${i}"></div><span id="step-label-${i}">${s}</span></div>`
+    ).join('');
+  }
+  function setStep(i, state, label) {
+    const step=document.getElementById('step-'+i);
+    const icon=document.getElementById('step-icon-'+i);
+    const lbl=document.getElementById('step-label-'+i);
+    if (!step) return;
+    step.className='step '+state;
+    icon.textContent=state==='done'?'✓':'';
+    if (label) lbl.textContent=label;
+  }
+  function setProgress(label, pct) {
+    document.getElementById('progress-label').textContent=label;
+    document.getElementById('progress-pct').textContent=Math.round(pct)+'%';
+    document.getElementById('progress-bar').style.width=pct+'%';
+  }
+
+  async function splitPdf(arrayBuffer) {
+    const { PDFDocument } = PDFLib;
+    const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+    const totalPages = srcDoc.getPageCount();
+    const bytesPerPage = arrayBuffer.byteLength / totalPages;
+    const pagesPerChunk = Math.min(15, Math.max(1, Math.floor(MAX_CHUNK_BYTES / bytesPerPage)));
+    const chunks = [];
+    let page = 0;
+    while (page < totalPages) {
+      const from = page, to = Math.min(page + pagesPerChunk, totalPages);
+      const indices = Array.from({length: to-from}, (_,k)=>from+k);
+      const chunkDoc = await PDFDocument.create();
+      const copied = await chunkDoc.copyPages(srcDoc, indices);
+      copied.forEach(p=>chunkDoc.addPage(p));
+      const bytes = await chunkDoc.save();
+      chunks.push({ bytes, from: from+1, to, total: totalPages });
+      page = to;
+    }
+    return chunks;
+  }
+
+  async function recognizeChunk(pdfBytes, key) {
+    let binary = '';
+    const bytes = new Uint8Array(pdfBytes);
+    for (let i=0; i<bytes.length; i+=8192)
+      binary += String.fromCharCode(...bytes.subarray(i, i+8192));
+    const base64 = btoa(binary);
+
+    const resp = await fetch('/api', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        api_key: getKey(),
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [{role:'user',content:[
+          {type:'document',source:{type:'base64',media_type:'application/pdf',data:base64}},
+          {type:'text',text:'Распознай и выведи весь текст с этого PDF. Если текст разделён на колонки — предупреди в начале. Только текст, без Markdown и звёздочек.'}
+        ]}]
+      })
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      if (resp.status===401) throw new Error('Неверный API ключ.');
+      if (resp.status===429) throw new Error('Превышен лимит запросов. Подождите минуту.');
+      throw new Error(data?.error?.message || 'HTTP '+resp.status);
+    }
+    return data.content?.[0]?.text?.trim() || '';
+  }
+
+  async function recognize() {
+    const key = getKey();
+    if (!key || !selectedFile) return;
+    setLoading(true); hideError(); hideResult();
+    try {
+      const ext = selectedFile.name.split('.').pop().toLowerCase();
+      const isPdf = ext === 'pdf';
+      const steps = isPdf
+        ? ['Читаю файл','Разбиваю на части','Распознавание','Собираю результат']
+        : ['Читаю файл','Распознавание'];
+      initSteps(steps);
+
+      setStep(0,'active'); setProgress('Читаю файл...', 2);
+
+      if (!isPdf) {
+        const base64 = await toBase64(selectedFile);
+        const mime = ext==='png'?'image/png':'image/jpeg';
+        setStep(0,'done'); setStep(1,'active');
+        setProgress('Нейросеть анализирует изображение...', 50);
+        const resp = await fetch('/api', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            api_key: key, model:'claude-sonnet-4-20250514', max_tokens:4096,
+            messages:[{role:'user',content:[
+              {type:'image',source:{type:'base64',media_type:mime,data:base64}},
+              {type:'text',text:'Распознай и выведи весь текст. Только текст, без Markdown.'}
+            ]}]
+          })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data?.error?.message||'HTTP '+resp.status);
+        setStep(1,'done'); setProgress('Готово!', 100);
+        showResult(data.content?.[0]?.text?.trim()||'');
+        return;
+      }
+
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      setStep(0,'done'); setStep(1,'active');
+      setProgress('Разбиваю на части...', 8);
+      const chunks = await splitPdf(arrayBuffer);
+      const total = chunks.length;
+      setStep(1,'done'); setStep(2,'active');
+
+      const results = [];
+      for (let i=0; i<total; i++) {
+        const c = chunks[i];
+        const pct = 12 + (i/total)*80;
+        setProgress(total===1?'Нейросеть анализирует документ...':`Часть ${i+1} из ${total} — стр. ${c.from}–${c.to} из ${c.total}`, pct);
+        setStep(2,'active',`Распознавание (${i+1}/${total})`);
+        const text = await recognizeChunk(c.bytes, key);
+        results.push(total>1?`--- Страницы ${c.from}–${c.to} ---\n${text}`:text);
+      }
+
+      setStep(2,'done'); setStep(3,'active');
+      setProgress('Собираю результат...', 96);
+      await new Promise(r=>setTimeout(r,300));
+      setStep(3,'done'); setProgress('Готово!', 100);
+      showResult(results.join('\n\n'));
+
+    } catch(e) {
+      showError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toBase64(file) {
+    return new Promise((res,rej) => {
+      const r = new FileReader();
+      r.onload = ()=>res(r.result.split(',')[1]);
+      r.onerror = ()=>rej(new Error('Не удалось прочитать файл'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function setLoading(on) {
+    document.getElementById('run-btn').disabled=on;
+    document.getElementById('progress').classList.toggle('show',on);
+  }
+  function showResult(t) {
+    document.getElementById('result-text').textContent=t;
+    document.getElementById('result-card').classList.add('show');
+    document.getElementById('result-card').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function hideResult() { document.getElementById('result-card').classList.remove('show'); }
+  function showError(m) { const e=document.getElementById('error-msg'); e.textContent='✗ '+m; e.classList.add('show'); }
+  function hideError() { document.getElementById('error-msg').classList.remove('show'); }
+  function getResultText() { return document.getElementById('result-text').textContent; }
+  function getFileName(ext) { return (selectedFile?.name||'result').replace(/\.[^.]+$/,'')+'_text.'+ext; }
+
+  async function copyResult() {
+    const t=getResultText();
+    try { await navigator.clipboard.writeText(t); } catch(_) {
+      const ta=document.createElement('textarea'); ta.value=t;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    const b=document.getElementById('copy-btn');
+    b.textContent='✓ СКОПИРОВАНО';
+    setTimeout(()=>b.textContent='КОПИРОВАТЬ',2000);
+  }
+  function downloadTxt() {
+    triggerDownload(URL.createObjectURL(new Blob([getResultText()],{type:'text/plain;charset=utf-8'})),getFileName('txt'));
+  }
+  function downloadPdf() {
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const text=getResultText(), margin=15;
+    const pageWidth=doc.internal.pageSize.getWidth()-margin*2;
+    const pageHeight=doc.internal.pageSize.getHeight()-margin*2;
+    doc.setFont('helvetica'); doc.setFontSize(10);
+    const lines=doc.splitTextToSize(text,pageWidth);
+    let y=margin;
+    for (const line of lines) {
+      if (y+6>pageHeight+margin) { doc.addPage(); y=margin; }
+      doc.text(line,margin,y); y+=6;
+    }
+    doc.save(getFileName('pdf'));
+  }
+  async function downloadDocx() {
+    const {Document,Packer,Paragraph,TextRun}=docx;
+    const text=getResultText();
+    const paragraphs=text.split('\n').map(line=>
+      new Paragraph({children:[new TextRun({text:line||' ',font:'Arial',size:22})],spacing:{after:line.trim()===''?0:120}})
+    );
+    const document=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:850,bottom:1134,left:1701}}},children:paragraphs}]});
+    triggerDownload(URL.createObjectURL(await Packer.toBlob(document)),getFileName('docx'));
+  }
+  function triggerDownload(url,name) {
+    const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
+  loadKey();
+</script>
+</body>
+</html>
