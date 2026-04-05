@@ -1,14 +1,16 @@
 import os
 import requests
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__)
 
 ANTHROPIC_KEY = os.environ.get('ANTHROPIC_KEY', '')
 
+HTML = open(os.path.join(os.path.dirname(__file__), 'static', 'index.html'), encoding='utf-8').read()
+
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    return HTML, 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 @app.route('/api', methods=['POST'])
 def proxy():
